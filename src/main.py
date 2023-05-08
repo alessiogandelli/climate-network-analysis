@@ -44,3 +44,30 @@ ig.plot(
 
 
 # %%
+g.vs['in_degree'] = g.indegree()
+g.vs['out_degree'] = g.outdegree()
+g.vs['degree'] = g.degree()
+# %%
+g.vs['in_degree'] = g.indegree()
+# %%
+d = {i['label']:i['degree'] for i in g.vs}
+degree = pd.DataFrame.from_dict(d, orient='index')
+degree.columns = ['degree']
+degree['bipartite'] = g.vs['bipartite']
+degree['degree'] = degree['degree'].astype(int)
+degree['bipartite'] = degree['bipartite'].astype(int)
+degree['indegree'] = g.vs['in_degree']
+degree['outdegree'] = g.vs['out_degree']
+top_users = degree[degree['bipartite'] == 0].sort_values(['degree', 'bipartite'], ascending=False).head(20) 
+top_tweets = degree[degree['bipartite'] == 1].sort_values(['degree', 'bipartite'], ascending=False).head(20)
+
+# %%
+
+
+tweet = 800010279136305152
+g.vs.select(label=tweet)
+
+# neighbors of tweet
+g.neighbors(tweet, mode='all')
+
+# %%
