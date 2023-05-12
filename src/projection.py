@@ -15,21 +15,25 @@ file = 'cop22retweets.gml'
 toy = '/Users/alessiogandelli/dev/internship/tweets-to-topic-network/data/networks/toyretweets.gml'
 
 
+#%%
 
-
-def recursive_explore(graph, node, visited, start_node, is_start_node = False, edges = None):
+def recursive_explore(graph, node, visited, start_node, is_start_node = False, edges = None, topic= None):
 
     if edges is None:
-        edges = []
+        edges = {}
     # it is a user 
     if node['bipartite'] == 0.0:
         if  not is_start_node and node != start_node:
            # print(start_node['label'], node['label'])
-            edges.append((start_node['label'], node['label']))
+            edges.setdefault(topic, []).append((start_node['label'], node['label']))
+            #edges.append(((start_node['label'], node['label']), topic))
             return edges
         elif node == start_node and not is_start_node:
             #print('ho incontrato di nuovo me')
             return 'me'
+    else :
+        if topic is None:
+            topic = node['topics']
     # it is a tweet
    
 
@@ -37,36 +41,39 @@ def recursive_explore(graph, node, visited, start_node, is_start_node = False, e
     neighbors = graph.neighborhood(node, mode='out')
 
 
-
     for neighbor in neighbors[1:]:
         if neighbor not in visited:
             node = g.vs[neighbor]
             
-            result = recursive_explore(graph, node, visited, start_node, False, edges)
+            result = recursive_explore(graph, node, visited, start_node, False, edges, topic)
             if result is None:
                 #print(start_node['label'], node['label'])
                 return result
 
     #print(start_node['label'] , node['author'])
-    edges.append((start_node['label'], node['author']))
-    return edges
+    #edges.append(((start_node['label'], node['author']), topic))
+    edges.setdefault(topic, []).append((start_node['label'], node['author']))
+    return edges, depth
 #%%
 
 # remove the edges with the same source and target
 
 
-#g = Graph.Read_GML(toy) # read graph 
-g = Graph.Read_GML(os.path.join(path, file)) # read graph
+g = Graph.Read_GML(sample) # read graph 
+#g = Graph.Read_GML(os.path.join(path, file)) # read graph
 
-edges = []
+edges = {}
 
 for n in g.vs.select(bipartite=0):
     # get all neighbors of g
-    visited = set()
-    result = recursive_explore(g, n, visited, start_node = n , is_start_node=True)
-    edges += result
 
-edges = set([e for e in edges if e[0] != e[1]])
+    print(n)
+    visited = set()
+    result, depth = recursive_explore(g, n, visited, start_node = n , is_start_node=True)
+    edges = {key: edges.get(key, []) + result.get(key, []) for key in set(edges) | set(result)}
+
+
+
 # %%
 
 
@@ -77,8 +84,77 @@ pg = nx.from_edgelist(edges, create_using=nx.DiGraph())
 nx.write_gml(pg, os.path.join(path, 'projection_retweet.gml'))
 # %%
 
-# get only ones with outdegree > 5
-pg = pg.subgraph([n for n in pg.nodes() if pg.out_degree(n) > 5])
 
-nx.draw(pg, with_labels=False)
+
+
 # %%
+sample = '/Volumes/boot420/Users/data/climate_network/test/networks/sampleretweets.gml'
+
+def project_graph(sample):
+
+    def recursive_explore(graph, node, visited, start_node, is_start_node = False, edges = None, topic= None):
+
+        if edges is None:
+            edges = {}
+        # it is a user 
+        if node['bipartite'] == 0.0:
+            if  not is_start_node and node != start_node:
+            # print(start_node['label'], node['label'])
+                edges.setdefault(topic, []).append((start_node['label'], node['label']))
+                #edges.append(((start_node['label'], node['label']), topic))
+                return edges
+            elif node == start_node and not is_start_node:
+                #print('ho incontrato di nuovo me')
+                return 'me'
+        else :
+            if topic is None:
+                topic = node['topics']
+        # it is a tweet
+    
+
+        visited.add(node)
+        neighbors = graph.neighborhood(node, mode='out')
+
+
+        for neighbor in neighbors[1:]:
+            if neighbor not in visited:
+                node = g.vs[neighbor]
+                
+                result = recursive_explore(graph, node, visited, start_node, False, edges, topic)
+                if result is None:
+                    #print(start_node['label'], node['label'])
+                    return result
+
+        #print(start_node['label'] , node['author'])
+        #edges.append(((start_node['label'], node['author']), topic))
+        edges.setdefault(topic, []).append((start_node['label'], node['author']))
+        return edges
+
+    g = Graph.Read_GML(sample)
+
+    edges = {}
+
+    for n in g.vs.select(bipartite=0):
+        # get all neighbors of g
+        visited = set()
+        result = recursive_explore(g, n, visited, start_node = n , is_start_node=True)
+
+        edges = {key: edges.get(key, []) + result.get(key, []) for key in set(edges) | set(result)}
+
+    edges = {e: set(edges[e]) for e in edges }
+    edges.pop(None, None)
+    # drop key 
+
+    return edges
+
+
+
+
+# %%
+edges = project_graph(sample)
+# %%
+graphs = {}
+for t, e in edges.items():
+    graphs[t] = nx.from_edgelist(e, create_using=nx.DiGraph())
+# %%
+

@@ -21,6 +21,8 @@ g = Graph.Read_GML(toy)
 
 # %%
 # sample of 100 nodes of bipartite = 0 and its neighbors
+g = Graph.Read_GML(os.path.join(path, file))
+
 bipartite = 1
 sample = g.vs.select(bipartite=bipartite)[0:10]
 sample_neighbors = g.neighborhood(sample, order=1, mode='all')
@@ -52,7 +54,7 @@ def plot_graph(gg):
         gg,
         target=ax,
         layout= "fr",
-        #vertex_label= None,
+        vertex_label= None,
         #vertex_label= gg.vs["bipartite"],
         vertex_color = ["red" if v["bipartite"] == 0.0 else "blue" for v in gg.vs],
         #vertex_label_color = "black",  # Adjust the label color
