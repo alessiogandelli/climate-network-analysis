@@ -17,10 +17,10 @@ import matplotlib.colors as mcolors
 
 
 # %% prepare data 
-n_cop = 22
+n_cop = 26
 
 folder = '/Users/alessiogandelli/data/cop' + str(n_cop) + '/'
-projected_path = folder + 'networks/cop' + str(n_cop) +'_retweets_ml.gml'
+projected_path = folder + 'networks/cop' + str(n_cop) +'_retweet_network_ml.gml'
 topic_label = json.load(open(folder + 'cache/labels_cop'+str(n_cop)+'.json'))
 topic_label = {int(k): v for k, v in topic_label.items()}# key float to int
 
@@ -28,6 +28,18 @@ mln = ml.read(projected_path)   # multilayer network
 
 layers = ml.to_nx_dict(mln) # dictionary where we have a networkx graph for each layer
 layers = {int(float(k)): v for k, v in layers.items()} # key float to int
+
+#%%
+
+# get number of nodes for each layer
+n_nodes = {k: v.number_of_nodes() for k, v in layers.items()}
+# plot number of nodes for each layer
+plt.figure(figsize=(12,4))
+plt.bar([str(k) for k in n_nodes.keys()], n_nodes.values())
+plt.xlabel('Layer')
+plt.ylabel('Number of nodes')
+plt.title('Number of nodes by layer for COP' + str(n_cop))
+plt.show()
 
 # %%
 
@@ -91,7 +103,7 @@ def get_polarization_by_layer(n_influencers = 30, n = 2):
     
     return res
 
-def plot_dip_test(res):
+def plot_dip_test(res, cop_name='COP'+str(n_cop)):
 
     # keys float to int
 
@@ -99,27 +111,76 @@ def plot_dip_test(res):
     diptest = [(r[0], r[1][0][0]) for r in res.items()]
     diptest_s = sorted(diptest, key=lambda x: x[1], reverse=True)
 
+    # add to diptest the number of nodes in each layer
+    diptest_s = [(d[0], d[1], layers[d[0]].number_of_nodes()) for d in diptest_s]
 
-    plt.figure(figsize=(12,4))
-    plt.bar([str(d[0]) for d in diptest_s], [d[1] for d in diptest_s])
+    n_nodes = [layers[k].number_of_nodes() for k, v in res.items()]
+
+
+
+    # grpuped bar chart witu n_nodes and diptest_s
+    fig, ax = plt.subplots(figsize=(12,4))
+
+    plt.title('Dip test and number of users by layer for ' + cop_name)
+
+    bars1 = ax.bar([str(d[0]) for d in diptest_s], [d[1] for d in diptest_s], label='Dip test')
+
+
+    ax.set_ylabel('Dip test')
+    ax.set_xlabel('Layer')
+    plt.axhline(y=np.mean([d[1] for d in diptest_s]), color='r', linestyle='-', label='Mean dip test')
+
+    ax2 = ax.twinx()
+    ax2.bar([str(d[0]) for d in diptest_s], [d[2] for d in diptest_s], color='orange', label='Number of users')
+    # broken axes between 80000 and 140000
+    ax2.set_ylim(0, 80000)
+    ax2.spines['top'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax2.xaxis.tick_bottom()
+    ax.tick_params(labeltop=False)  # don't put tick labels at the top
+    ax2.xaxis.set_ticks_position('none')  # don't put tick labels at the top
+    ax2.yaxis.set_ticks_position('left')
+    ax2.set_ylim(80000, 140000)
+    ax2.spines['bottom'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax2.xaxis.tick_top()
+    ax.tick_params(labelbottom=False)  # don't put tick labels at the top
+    
+    ax2.set_ylabel('Number of nodes')
+    ax.legend(loc='upper left')
+    ax2.legend(loc='upper right')
+
+    #bar widht 
+    # i want tonly half of the xtiks
+    plt.xticks([str(d[0]) for d in diptest_s], [str(d[0]) for d in diptest_s])
+    
+
+
+
+    #plt.figure(figsize=(12,4))
+    #plt.bar([str(d[0]) for d in diptest_s], [d[1] for d in diptest_s])
+
 
     # write xticks on top of the bar 
-    plt.xticks([str(d[0]) for d in diptest_s], rotation=90)
+    plt.xticks([str(d[0]) for d in diptest_s], [str(d[0]) for d in diptest_s])
+    plt.xticks(rotation=90)     
+
+    # add mean line to left axes 
 
 
-    # add mean
-    plt.axhline(y=np.mean([d[1] for d in diptest_s]), color='r', linestyle='-')
+
+    #plt.axhline(y=np.mean([d[1] for d in diptest_s]), color='r', linestyle='-')
     # add x label
-    plt.xlabel('Layer')
+    #plt.xlabel('Layer')
     # add y label
-    plt.ylabel('Dip test')
+    #plt.ylabel('Dip test')
     plt.show()
 
 
     # print the most and least polarized topics according to this test 
 
     # sort topic label according to diptest_s mantain keys
-    sorted_topic_label = [(k, topic_label[k]) for k, v in diptest_s]
+    sorted_topic_label = [(k[0], topic_label[k[0]]) for k  in diptest_s]
 
     # print 10 most and least polarized topics one per line
     print('Most polarized topics:')
@@ -212,6 +273,8 @@ def create_plots(topics, title,only_influencers=False):
         draw_network(topic, ax, only_influencers=only_influencers)
     plt.tight_layout()
     plt.show()
+
+plot_dip_test(res)
 # %%
 
 
@@ -234,12 +297,17 @@ create_plots(topics_not_pol,'least polarized topics'+' - ' + str(n_influencers) 
 
 # %%
 
+# first and last 5 of sorted_topic_label to latex table 
 
 
-
+df_topics_label = pd.DataFrame(sorted_topic_label, columns=['topic', 'label'], index=range(1, len(sorted_topic_label)+1))
+df_topics_label.head(10)
 
 #%%
 
 # %%
+create_plots([0,1,2,3], 'most polarized topics' + ' - ' + str(n_influencers) + ' influencers')
 
 
+
+# %%
