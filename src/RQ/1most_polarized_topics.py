@@ -1,51 +1,40 @@
-
 #%%
-from latent_ideology.latent_ideology_class import latent_ideology as li
-import pandas as pd
-import networkx as nx
-
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-import uunet.multinet as ml
-import json
-import matplotlib.pyplot as plt
-import diptest
 import numpy as np
+import json
+import uunet.multinet as ml
+import diptest
+from latent_ideology.latent_ideology_class import latent_ideology as li
+import networkx as nx
 import matplotlib.colors as mcolors
 
-
-
-# %% prepare data 
+#%%
+#load data 
 n_cop = 26
+n_influencers = 100
 
 folder = '/Users/alessiogandelli/data/cop' + str(n_cop) + '/'
 projected_path = folder + 'networks/cop' + str(n_cop) +'_retweet_network_ml.gml'
 topic_label = json.load(open(folder + 'cache/labels_cop'+str(n_cop)+'.json'))
 topic_label = {int(k): v for k, v in topic_label.items()}# key float to int
 
+retweet_df_path = folder + 'cache/retweets_labeled_cop'+str(n_cop)+'.pkl'
+tweet_cop26_path = folder + 'cache/tweets_cop26.pkl'
+
+retweet_df = pd.read_pickle(retweet_df_path)
+tweet_cop26 = pd.read_pickle(tweet_cop26_path)
 
 mln = ml.read(projected_path)   # multilayer network
-rt_net = nx.read_gml(rt_net_path)
 
 layers = ml.to_nx_dict(mln) # dictionary where we have a networkx graph for each layer
 layers = {int(float(k)): v for k, v in layers.items()} # key float to int
 
+
+rt_net_path = folder + 'networks/cop'+str(n_cop)+'_retweet_network.gml' 
+rt_net = nx.read_gml(rt_net_path)
 #%%
-
-# get number of nodes for each layer
-n_nodes = {k: v.number_of_nodes() for k, v in layers.items()}
-
-# plot number of nodes for each layer
-plt.figure(figsize=(12,4))
-plt.bar([str(k) for k in n_nodes.keys()], n_nodes.values())
-plt.xlabel('Layer')
-plt.ylabel('Number of nodes')
-plt.title('Number of nodes by layer for COP' + str(n_cop))
-plt.show()
-
-# %%
-
 
 def get_influencers(net, n_influencers):
     degree = net.degree()
@@ -56,8 +45,7 @@ def get_influencers(net, n_influencers):
 
     return influencers, users
 
-
-def get_polarization_by_layer(n_influencers = 30, n = 2):
+def get_polarization_by_layer(layers, n_influencers = 30, n = 3):
     res = {}
 
     for l in layers:
@@ -82,11 +70,13 @@ def get_polarization_by_layer(n_influencers = 30, n = 2):
             for e in edges:
                 connection_df = pd.concat([connection_df, pd.DataFrame({'influencer':i, 'user':e[0]}, index=[0])], ignore_index=True)
 
-
+        print(len(connection_df['influencer'].unique()), ' influencers')
+        print(len(connection_df['user'].unique()), ' users connected to influencers')
         # create matrix and apply latent ideology
         try:
             li_matrix = li(connection_df)
             df1, df2 = li_matrix.apply_method(n=n,targets='user', sources='influencer')
+            # perform dip test on scores
             test = df1['score'].to_numpy()
 
             dip_res = diptest.diptest(test)
@@ -100,14 +90,10 @@ def get_polarization_by_layer(n_influencers = 30, n = 2):
             print('Layer ', l, ' has too few data to be analyzed with latent ideology')
             continue
 
-
-        # perform dip test on scores
-
-
     
     return res
 
-def plot_dip_test(res, cop_name='COP'+str(n_cop)):
+def plot_dip_test(res, layers ,cop_name='COP'+str(n_cop)):
 
     # keys float to int
 
@@ -135,20 +121,20 @@ def plot_dip_test(res, cop_name='COP'+str(n_cop)):
     plt.axhline(y=np.mean([d[1] for d in diptest_s]), color='r', linestyle='-', label='Mean dip test')
 
     ax2 = ax.twinx()
-    ax2.bar([str(d[0]) for d in diptest_s], [d[2] for d in diptest_s], color='orange', label='Number of users')
-    # broken axes between 80000 and 140000
-    ax2.set_ylim(0, 80000)
+    ax2.bar([str(d[0]) for d in diptest_s], [d[2] for d in diptest_s], color='orange', label='Number of users', alpha=0.7)
+
     ax2.spines['top'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
-    ax2.xaxis.tick_bottom()
-    ax.tick_params(labeltop=False)  # don't put tick labels at the top
-    ax2.xaxis.set_ticks_position('none')  # don't put tick labels at the top
-    ax2.yaxis.set_ticks_position('left')
-    ax2.set_ylim(80000, 140000)
-    ax2.spines['bottom'].set_visible(False)
-    ax.spines['top'].set_visible(False)
-    ax2.xaxis.tick_top()
-    ax.tick_params(labelbottom=False)  # don't put tick labels at the top
+
+    # break ax 2 between 50000 and 90000
+ 
+  # don't put tick labels at the top
+
+
+
+    ax2.grid(False)
+    # ax 2 opacity
+    ax2.patch.set_alpha(0.5)
     
     ax2.set_ylabel('Number of nodes')
     ax.legend(loc='upper left')
@@ -159,25 +145,11 @@ def plot_dip_test(res, cop_name='COP'+str(n_cop)):
     plt.xticks([str(d[0]) for d in diptest_s], [str(d[0]) for d in diptest_s])
     
 
-
-
-    #plt.figure(figsize=(12,4))
-    #plt.bar([str(d[0]) for d in diptest_s], [d[1] for d in diptest_s])
-
-
-    # write xticks on top of the bar 
     plt.xticks([str(d[0]) for d in diptest_s], [str(d[0]) for d in diptest_s])
     plt.xticks(rotation=90)     
 
     # add mean line to left axes 
 
-
-
-    #plt.axhline(y=np.mean([d[1] for d in diptest_s]), color='r', linestyle='-')
-    # add x label
-    #plt.xlabel('Layer')
-    # add y label
-    #plt.ylabel('Dip test')
     plt.show()
 
 
@@ -186,18 +158,19 @@ def plot_dip_test(res, cop_name='COP'+str(n_cop)):
     # sort topic label according to diptest_s mantain keys
     sorted_topic_label = [(k[0], topic_label[k[0]]) for k  in diptest_s]
 
+    print(sorted_topic_label)
+
     # print 10 most and least polarized topics one per line
     print('Most polarized topics:')
-    for i in range(10):
+    for i in range(min(10, len(sorted_topic_label))):
         print(sorted_topic_label[i][0], sorted_topic_label[i][1])
     print('')
     print('Least polarized topics:')
+    for i in range(min(10, len(sorted_topic_label))):
+        print(sorted_topic_label[-i-1][0], sorted_topic_label[-i-1][1])
 
-    for i in range(1,9):
-        print(sorted_topic_label[-i][0], sorted_topic_label[-i][1])
 
     return sorted_topic_label
-    # plot sorted topic label
 
 def draw_network(topic, ax, only_influencers=False):
     # get network and df of correspondence analysis of the users 
@@ -278,18 +251,90 @@ def create_plots(topics, title,only_influencers=False):
     plt.tight_layout()
     plt.show()
 
-plot_dip_test(res)
+def ridge_plot(topics_df, topics, title):
+    # get only topic 1,2,3 in the same df
+    topics_df = retweet_df[retweet_df['topic'].isin(topics)]
+
+    topics_df['day'] = pd.to_datetime(topics_df['date']).dt.date
+
+    topics_df = topics_df[topics_df['day'] >= pd.to_datetime('2021-10-22').date()]
+    topics_df = topics_df[topics_df['day'] <= pd.to_datetime('2021-11-17').date()]
+
+    topics_df['day'] = pd.to_datetime(topics_df['day'])
+
+
+    # ridge plot 
+    # https://seaborn.pydata.org/examples/kde_ridgeplot.html
+
+    # Initialize the FacetGrid object
+    pal = sns.cubehelix_palette(10, rot=-.25, light=.7)
+    g = sns.FacetGrid(topics_df, row="topic", hue="topic", aspect=8, height=1, palette=pal)
+
+    # set title 
+    g.fig.suptitle(title + ' Polarized  over time for cop26', fontsize=25)
+
+    # Draw the densities of the date 
+    g.map(sns.kdeplot, "day", clip_on=False, fill=True, alpha=1, lw=1.5, bw_method=.2)
+    g.map(sns.kdeplot, "day", clip_on=False, color="w", lw=2, bw_method=.2)
+    g.map(plt.axhline, y=0, lw=2, clip_on=False)
+
+    # Define and use a simple function to label the plot in axes coordinates
+    def label(x, color, label):
+        ax = plt.gca()
+        ax.text(0, .2, label, fontweight="bold", color=color,
+                ha="left", va="center", transform=ax.transAxes)
+        
+    g.map(label, "day")
+
+    # Set the subplots to overlap
+    g.fig.subplots_adjust(hspace=0.2)
+
+    # Remove axes details that don't play well with overlap
+    g.set_titles("")
+    g.set(yticks=[])
+    g.despine(bottom=True, left=True)
+
+    # hide y label 
+    g.set(ylabel='')
+
+    #xlim 
+    g.set(xlim=(pd.to_datetime('2021-10-22').date(), pd.to_datetime('2021-11-17').date()))
+
+    # add something to undertline that between 31th october and 12 november there was the cop
+    # https://stackoverflow.com/questions/48145929/how-to-add-a-horizontal-line-in-seaborn-ridgeplot
+
+    # add vertical line for cop start for all topics
+    for ax in g.axes.flat:
+        ax.axvline(x=pd.to_datetime('2021-10-31').date(), color='black', linestyle='--')
+        ax.axvline(x=pd.to_datetime('2021-11-12').date(), color='black', linestyle='--')
+        ax.tick_params(axis='x', rotation=90)
+
+    
+
+    ax.xaxis.set_major_locator(mdates.DayLocator(interval=2))
+
+
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b-%d'))
+
+    plt.show()
+
 # %%
 
+n_nodes = {k: v.number_of_nodes() for k, v in layers.items()}
+print('Number of layers: ', len(n_nodes))
 
+# remove layers with less than 2000 nodes and outliers 
+n_nodes = {k: v for k, v in n_nodes.items() if v > 2000 and k != -1}
 
-n_influencers = 30
+print('Number of layers after filtering: ', len(n_nodes))
+layers = {k: v for k, v in layers.items() if k in n_nodes.keys()}
 
-res = get_polarization_by_layer(n_influencers = n_influencers, n=3)
-sorted_topic_label = plot_dip_test(res)
+# %%
 
-#%%
-# Example usage
+res = get_polarization_by_layer(layers, n_influencers = 100, n = 2)
+
+sorted_topic_label= plot_dip_test(res, layers)
+# %%
 topics_pol = [t[0] for t in sorted_topic_label[:5]]
 topics_not_pol = [t[0] for t in sorted_topic_label[-5:]]
 topics_not_pol.reverse()
@@ -299,19 +344,53 @@ create_plots(topics_pol,'most polarized topics' + ' - ' + str(n_influencers) + '
 create_plots(topics_not_pol, 'least polarized topics' + ' - ' + str(n_influencers) + ' influencers')
 create_plots(topics_not_pol,'least polarized topics'+' - ' + str(n_influencers) + ' influencers', only_influencers=True)
 
+
+
+import matplotlib.cbook as cbook
+import matplotlib.dates as mdates
+
+
+
 # %%
 
-# first and last 5 of sorted_topic_label to latex table 
+
+# %%
+# get tweets only topic 4 
+topic4 = retweet_df[retweet_df['author'] == '164929952']
+topic4 =  topic4[topic4['topic'] == 4]
 
 
-df_topics_label = pd.DataFrame(sorted_topic_label, columns=['topic', 'label'], index=range(1, len(sorted_topic_label)+1))
-df_topics_label.head(10)
+# %%
+# t20 analysis 
+
+t20_users = res[20][1]
+t20_influencer  = res[20][2]
+
+t20_scores = pd.concat([t20_users, t20_influencer])
+t20_scores.rename(columns={'user':'author_name'}, inplace=True)
+
+t20 = retweet_df[retweet_df['topic'] == 20]
+
+
+# add the score to users 
+t20 = t20.merge(t20_scores, on='author_name', how='left')
+
+
+
+
+# %%
+#get influencer tweets 
+t20_influencer_tweets = t20[t20['author_name'].isin(t20_influencer['source'])]
+
+
 
 #%%
-
-# %%
-create_plots([0,1,2,3], 'most polarized topics' + ' - ' + str(n_influencers) + ' influencers')
+influencers, _ = get_influencers(rt_net, n_influencers)
 
 
 
-# %%
+
+
+#%% full network 
+res = get_polarization_by_layer({1:rt_net}, n_influencers=100, n=4)
+create_plots([1,1],'cop26',only_influencers=False )
