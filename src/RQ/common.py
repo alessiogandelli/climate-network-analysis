@@ -1,3 +1,4 @@
+#%%
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -157,7 +158,7 @@ topic_label = json.load(open(folder + 'cache/labels_cop'+str(n_cop)+'.json'))
 topic_label = {int(k): v for k, v in topic_label.items()}# key float to int
 
 retweet_df_path = folder + 'cache/retweets_labeled_cop'+str(n_cop)+'.pkl'
-tweet_cop26_path = folder + 'cache/tweets_cop26.pkl'
+tweet_cop26_path = folder + 'cache/tweets_cop'+str(n_cop)+'.pkl'
 
 retweet_df = pd.read_pickle(retweet_df_path)
 tweet_cop26 = pd.read_pickle(tweet_cop26_path)
@@ -189,3 +190,7 @@ layers = {k: v for k, v in layers.items() if k in n_nodes.keys()}
 res = get_polarization_by_layer(layers, n_influencers = 100, n = 2)
 sorted_topic_label= plot_dip_test(res, layers)
 
+
+# %%
+len(res)
+# %%

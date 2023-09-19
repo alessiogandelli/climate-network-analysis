@@ -29,10 +29,103 @@ retweet_df = retweet_df[retweet_df['topic'] != -1]
 retweet_df = retweet_df.groupby('topic').filter(lambda x: len(x) > 1000)
 
 # %%
-cop_topic = retweet_df.groupby(['cop','topic']).count()['author']#.reset_index()
+cop_topic = retweet_df.groupby(['cop','topic']).count()['author'].reset_index()
 
 # heatmap
 cop_topic = cop_topic.pivot(index='cop', columns='topic', values='author')
+
+#normalize columns so the sum of the column is 1
+cop_topic = cop_topic.div(cop_topic.sum(axis=0), axis=1)
+
+#%% !!!!!! this is good 
+################################################################
+# divergin bar plot cop21 one side cop26 the other side
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Assuming df is your DataFrame
+df_transposed = cop_topic.transpose().sort_values(by='cop26', ascending=False).reset_index()
+
+df_transposed['topic'] = df_transposed['topic'].astype('str')
+
+# Create figure and axes
+fig, ax = plt.subplots()
+
+fig.set_size_inches(5, 7)
+
+# Create a bar for cop26
+ax.barh(df_transposed['topic'], df_transposed['cop26'], color='b', label='cop26')
+
+# Create a bar for cop21 in the opposite direction
+ax.barh(df_transposed['topic'], -df_transposed['cop21'], color='r', label='cop21')
+
+# Set labels and title
+ax.set_xlabel('Count')
+ax.set_ylabel('Topic')
+
+ax.set_title('Comparison of cop21 and cop26 for each topic')
+
+#yticks 
+
+
+# Add a vertical line at x=0
+ax.axvline(0, color='black')
+
+# Show legend
+ax.legend()
+
+# Show the plot
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # %%
 # Import the libraries
@@ -49,7 +142,6 @@ cop_topic = retweet_df.groupby(['cop','topic']).count()['author']
 # drop topic 0
 cop_topic = cop_topic.drop(0, level=1)
 
-# Unstack
 cop_topic_df = cop_topic.unstack(level=0)
 
 # Create the heatmap
@@ -156,4 +248,9 @@ fig.show()
 
 
 
+# %%
+# violin plot 
+# https://plotly.com/python/violin/
+
+# Set the title
 # %%
