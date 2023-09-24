@@ -1,4 +1,3 @@
-#%%
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -67,7 +66,7 @@ def get_polarization_by_layer(layers_p, n_influencers = 30, n = 3):
     
     return res
 
-def plot_dip_test(res_l, layers_l ,cop_name='COP'):
+def plot_dip_test(res_l, layers_l , topic_label ,cop_name='COP'):
 
     # keys float to int
 
@@ -146,58 +145,68 @@ def plot_dip_test(res_l, layers_l ,cop_name='COP'):
 
     return sorted_topic_label
 
+def draw_network(topic, ax, l, ris, only_influencers=False):
+    net = l[topic]
+    df1 = ris[topic][1]
+    df2 = ris[topic][2]
 
+    # merge dataframe of users 
+    df1.rename(columns={'target':'user'}, inplace=True)
+    df2.rename(columns={'source':'user'}, inplace=True)
+    df = pd.concat([df1, df2], ignore_index=True)
+    df.set_index('user', inplace=True)
 
-# %%load data 
-n_cop = '2x'
-n_influencers = 100
-
-folder = '/Users/alessiogandelli/data/cop' + str(n_cop) + '/'
-projected_path = folder + 'networks/cop' + str(n_cop) +'_retweet_network_ml.gml'
-topic_label = json.load(open(folder + 'cache/labels_cop'+str(n_cop)+'.json'))
-topic_label = {int(k): v for k, v in topic_label.items()}# key float to int
-
-retweet_df_path = folder + 'cache/retweets_labeled_cop'+str(n_cop)+'.pkl'
-tweet_cop26_path = folder + 'cache/tweets_cop'+str(n_cop)+'.pkl'
-
-retweet_df = pd.read_pickle(retweet_df_path)
-tweet_cop26 = pd.read_pickle(tweet_cop26_path)
-
-mln = ml.read(projected_path)   # multilayer network
-
-layers = ml.to_nx_dict(mln) # dictionary where we have a networkx graph for each layer
-layers = {int(float(k)): v for k, v in layers.items()} # key float to int
-
-
-rt_net_path = folder + 'networks/cop'+str(n_cop)+'_retweet_network.gml' 
-rt_net = nx.read_gml(rt_net_path)
-
-
-
-#%% filter layers with less then 2000 nodes 
-
-n_nodes = {k: v.number_of_nodes() for k, v in layers.items()}
-print('Number of layers: ', len(n_nodes))
-
-# remove layers with less than 2000 nodes and outliers 
-#n_nodes = {k: v for k, v in n_nodes.items() if v > 2000 and k != -1}
-n_nodes = {k: v for k, v in n_nodes.items() if  k != -1}
-
-print('Number of layers after filtering: ', len(n_nodes))
-layers = {k: v for k, v in layers.items() if k in n_nodes.keys()}
-
-# %%
-
-res = get_polarization_by_layer(layers, n_influencers = 100, n = 2)
-sorted_topic_label= plot_dip_test(res, layers)
-
-
-#get polarization for every index 
-polarization = {int(float(k)): v[0][0] for k, v in res.items()}
+    # add score to network
+    nx.set_node_attributes(net, df['score'].to_dict(), 'score')
 
 
 
 
-# %%
-create_plots([26,21], 'cop26 vs cop21', only_influencers=False)
-# %%
+    influencers, users = get_influencers(net, 30)
+
+
+    # remove self loops
+    net.remove_edges_from(nx.selfloop_edges(net))
+
+    net = net.subgraph(influencers) if only_influencers else net.subgraph(influencers + users)
+
+    net = net.to_undirected()
+
+    # delete node when score does not exist, because it's a user that never interacted with an influencer
+    for node in net.copy():
+        if 'score' not in net.nodes[node]:
+            net.remove_node(node)
+
+    # gradient color depending on the score 
+    cmap = plt.get_cmap('spring')
+    scores = [d['score'] for n, d in net.nodes(data=True)]
+    norm = mcolors.Normalize(vmin=min(scores), vmax=max(scores))
+    colors = [cmap(norm(score)) for score in scores]
+
+
+    # remove edges that do not involve a influencer
+    edges = list(net.edges())
+    for e in edges:
+        if e[0] not in influencers and e[1] not in influencers:
+            net.remove_edge(e[0], e[1])
+
+
+
+
+
+    size_map = [100 if node in influencers else 5 for node in net]
+
+    x_noise = 0.0 if only_influencers else 0.01
+
+    # use score for position but add noise in the other dimension
+    pos = {n: [d['score'] + np.random.normal(0, x_noise), np.random.normal(0, 0.1)] for n, d in net.nodes(data=True)}
+
+
+    # add title to plot
+    #plt.title('Topic: ' + str(topic) + ' - ' + topic_label[topic])
+
+
+    nx.draw(net, pos=pos ,node_color=colors, with_labels=False, node_size=size_map, width=0.3, ax=ax)
+
+    return ax
+
