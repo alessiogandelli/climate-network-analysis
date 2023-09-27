@@ -147,9 +147,8 @@ def plot_dip_test(res_l, layers_l ,cop_name='COP'):
     return sorted_topic_label
 
 
-
 # %%load data 
-n_cop = '2x'
+n_cop = '26'
 n_influencers = 100
 
 folder = '/Users/alessiogandelli/data/cop' + str(n_cop) + '/'
@@ -190,6 +189,9 @@ layers = {k: v for k, v in layers.items() if k in n_nodes.keys()}
 
 res = get_polarization_by_layer(layers, n_influencers = 100, n = 2)
 sorted_topic_label= plot_dip_test(res, layers)
+
+
+n_topics = len(sorted_topic_label)
 
 
 #get polarization for every index 
