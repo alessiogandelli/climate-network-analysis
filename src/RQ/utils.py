@@ -8,6 +8,9 @@ import diptest
 from latent_ideology.latent_ideology_class import latent_ideology as li
 import networkx as nx
 import matplotlib.colors as mcolors
+import matplotlib.colors as mcolors
+import matplotlib.cbook as cbook
+import matplotlib.dates as mdates
 
 def get_influencers(net, n_influencers):
     degree = net.degree()
@@ -82,15 +85,16 @@ def plot_dip_test(res_l, layers_l , topic_label ,cop_name='COP'):
 
 
     # grpuped bar chart witu n_nodes and diptest_s
-    fig, ax = plt.subplots(figsize=(12,4))
+    fig, ax = plt.subplots(figsize=(8,4))
 
-    plt.title('Dip test and number of users by layer for ' + cop_name)
+    plt.title('Dip test and number of users by layer for ' + cop_name, fontsize=20)
 
     bars1 = ax.bar([str(d[0]) for d in diptest_s], [d[1] for d in diptest_s], label='Dip test')
 
 
-    ax.set_ylabel('Dip test')
-    ax.set_xlabel('Layer')
+    ax.set_ylabel('Dip test', fontdict={'fontsize': 16})
+    ax.set_xlabel('Layer', fontdict={'fontsize': 16})
+    ax.tick_params(axis='both', which='major', labelsize=14)
     plt.axhline(y=np.mean([d[1] for d in diptest_s]), color='r', linestyle='-', label='Mean dip test')
 
     ax2 = ax.twinx()
@@ -119,11 +123,13 @@ def plot_dip_test(res_l, layers_l , topic_label ,cop_name='COP'):
     
 
     plt.xticks([str(d[0]) for d in diptest_s], [str(d[0]) for d in diptest_s])
-    plt.xticks(rotation=90)     
+    plt.xticks(rotation=90, fontsize=14)     
 
     # add mean line to left axes 
 
     plt.show()
+
+    fig.savefig('dip_test_' + cop_name + '.pdf',format= 'pdf' ,bbox_inches='tight', dpi=800)
 
 
     # print the most and least polarized topics according to this test 
@@ -210,3 +216,93 @@ def draw_network(topic, ax, l, ris, only_influencers=False):
 
     return ax
 
+
+def create_plots(topics, title,only_influencers=False, topic_label=None):
+    fig, axs = plt.subplots(len(topics), figsize=(8, 8))
+    # add title 
+    fig.suptitle(title, fontsize=25)
+
+    for i, topic in enumerate(topics):
+        ax = axs[i]
+        ax.set_title('Topic: ' + str(topic) + ' - ' + topic_label[topic])
+        draw_network(topic, ax, only_influencers=only_influencers)
+    plt.tight_layout()
+    plt.show()
+
+    #save publication quality images in pdf 
+    fig.savefig(title +'.pdf',format= 'pdf' ,bbox_inches='tight', dpi=800)
+
+def ridge_plot(retweet_df, topics, title):
+    #
+    topics_df = retweet_df[retweet_df['topic'].isin(topics)]
+
+    topics_df['day'] = pd.to_datetime(topics_df['date']).dt.date
+
+    topics_df = topics_df[topics_df['day'] >= pd.to_datetime('2021-10-22').date()]
+    topics_df = topics_df[topics_df['day'] <= pd.to_datetime('2021-11-17').date()]
+
+    topics_df['day'] = pd.to_datetime(topics_df['day'])
+
+
+    # ridge plot 
+    # https://seaborn.pydata.org/examples/kde_ridgeplot.html
+
+    # Initialize the FacetGrid object
+    pal = sns.cubehelix_palette(10, rot=-.25, light=.7)
+    g = sns.FacetGrid(topics_df, row="topic", hue="topic", aspect=8, height=1, palette=pal)
+
+    # set title 
+    g.fig.suptitle(title + ' Polarized', fontsize=25)
+
+    # Draw the densities of the date 
+    g.map(sns.kdeplot, "day", clip_on=False, fill=True, alpha=1, lw=1.5, bw_method=.2)
+    g.map(sns.kdeplot, "day", clip_on=False, color="w", lw=2, bw_method=.2)
+    g.map(plt.axhline, y=0, lw=2, clip_on=False)
+
+    # Define and use a simple function to label the plot in axes coordinates
+    def label(x, color, label):
+        ax = plt.gca()
+        ax.text(0, .2, label, fontweight="bold", color=color,
+                ha="left", va="center", transform=ax.transAxes)
+        
+    g.map(label, "day")
+
+    # Set the subplots to overlap
+    g.fig.subplots_adjust(hspace=0.2)
+
+    # Remove axes details that don't play well with overlap
+    g.set_titles("")
+    g.set(yticks=[])
+    g.despine(bottom=True, left=True)
+
+    # hide y label 
+    g.set(ylabel='')
+
+    #xlim 
+    g.set(xlim=(pd.to_datetime('2021-10-22').date(), pd.to_datetime('2021-11-17').date()))
+
+    # add something to undertline that between 31th october and 12 november there was the cop
+    # https://stackoverflow.com/questions/48145929/how-to-add-a-horizontal-line-in-seaborn-ridgeplot
+
+    # add vertical line for cop start for all topics
+    for ax in g.axes.flat:
+        ax.axvline(x=pd.to_datetime('2021-10-31').date(), color='black', linestyle='--')
+        ax.axvline(x=pd.to_datetime('2021-11-12').date(), color='black', linestyle='--')
+        ax.tick_params(axis='x', rotation=90)
+
+    
+
+    ax.xaxis.set_major_locator(mdates.DayLocator(interval=2))
+
+
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b-%d'))
+
+    # figsize 
+    g.fig.set_figwidth(5)
+
+    #tight layout
+    plt.tight_layout()
+    #save fig 
+    g.savefig(title +'.pdf',format= 'pdf' ,bbox_inches='tight', dpi=800)
+
+    plt.show()

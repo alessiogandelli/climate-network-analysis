@@ -10,6 +10,8 @@ users_df = pd.DataFrame(columns=['target'])
 influencers_df = pd.DataFrame(columns=['source'])
 #res = get_polarization_by_layer(layers, n_influencers = 100, n = 2)
 
+
+
 #res = {}
 
 for topic, r in res.items():
